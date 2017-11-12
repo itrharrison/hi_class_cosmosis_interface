@@ -6,7 +6,7 @@ import sys
 dirname = os.path.split(__file__)[0]
 #enable debugging from the same directory
 if not dirname.strip(): dirname='.'
-install_dir = dirname+"/class_v2.4.1/classy_install/lib/python2.7/site-packages/"
+install_dir = dirname+"/hi_class_devel/classy_install/lib/python2.7/site-packages/"
 sys.path.insert(0, install_dir)
 
 import classy
@@ -38,7 +38,7 @@ def get_class_inputs(block, config):
     #Get parameters from block and give them the
     #names and form that class expects
     params = {
-        'output': 'tCl pCl mPk',
+        'output': 'tCl, pCl, mPk',
         'modes': 's, t',
         'l_max_scalars': config["lmax"],
         'P_k_max_h/Mpc':  config["kmax"],
@@ -52,7 +52,7 @@ def get_class_inputs(block, config):
         'tau_reio':  block[cosmo, 'tau'],
         'T_cmb':     block.get_double(cosmo, 't_cmb', default=2.726),
         'N_eff':     block.get_double(cosmo, 'massless_nu', default=3.046),
-        'r':         block[cosmo, 'r_t'],
+        'r':         block.get_double(cosmo, 'r_t', default=0.),
     }
     return params
 
