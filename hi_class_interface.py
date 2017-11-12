@@ -38,7 +38,7 @@ def get_class_inputs(block, config):
     #Get parameters from block and give them the
     #names and form that class expects
     params = {
-        'output': 'tCl, pCl, mPk',
+        'output': 'tCl,pCl,mPk',
         'modes': 's, t',
         'l_max_scalars': config["lmax"],
         'P_k_max_h/Mpc':  config["kmax"],
