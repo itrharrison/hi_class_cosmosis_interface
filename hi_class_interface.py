@@ -38,8 +38,9 @@ def get_class_inputs(block, config):
     #Get parameters from block and give them the
     #names and form that class expects
     params = {
-        'output': 'tCl,pCl,mPk',
+        'output': 'tCl,pCl,lCl,mPk',
         'modes': 's, t',
+        'expansion_model':'lcdm',
         'l_max_scalars': config["lmax"],
         'P_k_max_h/Mpc':  config["kmax"],
         'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
@@ -53,6 +54,9 @@ def get_class_inputs(block, config):
         'T_cmb':     block.get_double(cosmo, 't_cmb', default=2.726),
         'N_eff':     block.get_double(cosmo, 'massless_nu', default=3.046),
         'r':         block.get_double(cosmo, 'r_t', default=0.),
+        'Omega_Lambda': block[cosmo, 'omega_Lambda'],
+        'Omega_smg': block[cosmo, 'omega_smg'],
+        'Omega_fld': block[cosmo, 'omega_fld'],
     }
     return params
 
@@ -103,6 +107,7 @@ def get_class_outputs(block, c, config):
     d_a = np.array([c.angular_distance(zi) for zi in z])
     block[distances, 'd_a'] = d_a
     block[distances, 'd_m'] = d_a * (1+z)
+    block[distances, 'h'] = np.array([c.Hubble(zi) for zi in z])
 
     #Save some auxiliary related parameters
     block[distances, 'age'] = c.age()
