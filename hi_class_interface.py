@@ -41,6 +41,7 @@ def get_class_inputs(block, config):
         'output': 'tCl,pCl,lCl,mPk',
         'modes': 's, t',
         'expansion_model':'lcdm',
+        'gravity_model':'propto_omega',
         'l_max_scalars': config["lmax"],
         'P_k_max_h/Mpc':  config["kmax"],
         'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
@@ -55,8 +56,11 @@ def get_class_inputs(block, config):
         'N_eff':     block.get_double(cosmo, 'massless_nu', default=3.046),
         'r':         block.get_double(cosmo, 'r_t', default=0.),
         'Omega_Lambda': block[cosmo, 'omega_Lambda'],
-        'Omega_smg': block[cosmo, 'omega_smg'],
+        'Omega_smg': block.get_double(cosmo, 'omega_smg', default = 0.),
         'Omega_fld': block[cosmo, 'omega_fld'],
+        #'Omega_scf': block.get_double(cosmo, 'omega_scf', default = 0.),
+        'expansion_smg':block[cosmo, 'expansion_smg'],
+        'parameters_smg':block.get_string(cosmo, 'parameters_smg', default = '1., 0., 0., 0., 1.'),
     }
     return params
 
