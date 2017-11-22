@@ -37,6 +37,7 @@ def get_class_inputs(block, config):
 
     #Get parameters from block and give them the
     #names and form that class expects
+    smgs = smg_params(block)
     params = {
         'output': 'tCl,pCl,lCl,mPk',
         'modes': 's, t',
@@ -60,7 +61,7 @@ def get_class_inputs(block, config):
         'Omega_fld': block[cosmo, 'omega_fld'],
         #'Omega_scf': block.get_double(cosmo, 'omega_scf', default = 0.),
         'expansion_smg':block[cosmo, 'expansion_smg'],
-        'parameters_smg':block.get_string(cosmo, 'parameters_smg', default = '1., 0., 0., 0., 1.'),
+        'parameters_smg':block.get_string(cosmo, 'parameters_smg', default = smgs),
     }
     return params
 
@@ -135,8 +136,6 @@ def get_class_outputs(block, c, config):
     for s in ['tt','ee','te','bb']:
         block[cmb_cl, s] = c_ell_data[s][2:] * f
 
-
-
 def execute(block, config):
     c = config['cosmo']
 
@@ -157,3 +156,24 @@ def execute(block, config):
 def cleanup(config):
     config['cosmo'].empty()
 
+def smg_params(block): # il = initial parameters_smg list, ep = position of the element you wish to chnnge, ne = value f the new element
+   # sl = list(parameters_smg)
+   # for n in range(len(sl)):
+   #     if sl[n]==',':
+   #         sl[n]=' '
+
+    #sn = "".join(sl)
+
+    #snl=map(float, sn.split()) # the list of floats
+
+    #snl[ep]=ne # change the value of the element
+    smg1 = block.get_double(cosmo, 'parameters_smg__1', default = 1.)
+    smg2 = block.get_double(cosmo, 'parameters_smg__2', default = 0.)
+    smg3 = block.get_double(cosmo, 'parameters_smg__3', default = 0.)
+    smg4 = block.get_double(cosmo, 'parameters_smg__4', default = 0.)
+    smg5 = block.get_double(cosmo, 'parameters_smg__5', default = 1.)
+    snl = [smg1,smg2,smg3,smg4,smg5]
+
+    #sn1 = ",".join(map(str, snl))  # convert back to string
+    smg = ",".join(map(str, snl))
+    return smg
