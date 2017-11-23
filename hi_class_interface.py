@@ -11,12 +11,14 @@ sys.path.insert(0, install_dir)
 
 import classy
 import numpy as np
+import ConfigParser
 
 #These are pre-defined strings we use as datablock
 #section names
 cosmo = names.cosmological_parameters
 distances = names.distances
 cmb_cl = names.cmb_cl
+configpars = ConfigParser.RawConfigParser()
 
 def setup(options):
     #Read options from the ini file which are fixed across
@@ -37,30 +39,32 @@ def get_class_inputs(block, config):
 
     #Get parameters from block and give them the
     #names and form that class expects
-    smgs = smg_params(block)
-    try:
-        block[cosmo,'omega_smg']
-    except NameError:
-        params = {
-            'output': 'tCl,pCl,lCl,mPk',
-            'modes': 's, t',
-            'l_max_scalars': config["lmax"],
-            'P_k_max_h/Mpc':  config["kmax"],
-            'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
-            'lensing': 'no',
-            'A_s':       block[cosmo, 'A_s'],
-            'n_s':       block[cosmo, 'n_s'],
-            'H0':        100*block[cosmo, 'h0'],
-            'omega_b':   block[cosmo, 'ombh2'],
-            'omega_cdm': block[cosmo, 'omch2'],
-            'tau_reio':  block[cosmo, 'tau'],
-            'T_cmb':     block.get_double(cosmo, 't_cmb', default=2.726),
-            'N_eff':     block.get_double(cosmo, 'massless_nu', default=3.046),
-            'r':         block.get_double(cosmo, 'r_t', default=0.),
-            #'Omega_smg': block.get_double(cosmo, 'omega_smg', default = 0.),
+    params_c = {
+        'output': 'tCl,pCl,lCl,mPk',
+        'modes': 's, t',
+        'l_max_scalars': config["lmax"],
+        'P_k_max_h/Mpc':  config["kmax"],
+        'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
+        'lensing': 'no',
+        'A_s':       block[cosmo, 'A_s'],
+        'n_s':       block[cosmo, 'n_s'],
+        'H0':        100*block[cosmo, 'h0'],
+        'omega_b':   block[cosmo, 'ombh2'],
+        'omega_cdm': block[cosmo, 'omch2'],
+        'tau_reio':  block[cosmo, 'tau'],
+        'T_cmb':     block.get_double(cosmo, 't_cmb', default=2.726),
+        'N_eff':     block.get_double(cosmo, 'massless_nu', default=3.046),
+        'r':         block.get_double(cosmo, 'r_t', default=0.),
         }
-    else:
+
+    #try:
+    #    config.get(cosmo,'omega_smg')
+   # except ConfigParser.NoOptionError:
+   #     pass
+   #     params = params_c
+    if configpars.has_option(cosmo, 'omega_smg'):
         if block[cosmo,'omega_smg'] < 0.:
+            smgs = smg_params(block)
             params = {
                 'output': 'tCl,pCl,lCl,mPk',
                 'modes': 's, t',
@@ -81,7 +85,7 @@ def get_class_inputs(block, config):
                 'r':         block.get_double(cosmo, 'r_t', default=0.),
                 'Omega_Lambda': block[cosmo, 'omega_Lambda'],
                 'Omega_smg': block.get_double(cosmo, 'omega_smg', default = 0.),
-                'Omega_fld': block.get_double(cosmo, 'omega_fld', default = 0.),
+                'Omega_fld': block.get_double(cosmo, 'omega_sfld', default = 0.),
                 #'w0_fld': block.get_double(cosmo, 'w0_fld', default = -0.9),
                 #'wa_fld': block[cosmo, 'wa_fld'],
                 #'cs2_fld': block[cosmo, 'cs2_fld'],
@@ -90,25 +94,9 @@ def get_class_inputs(block, config):
                 'parameters_smg':block.get_string(cosmo, 'parameters_smg', default = smgs),
             }
         else:
-            params = {
-                'output': 'tCl,pCl,lCl,mPk',
-                'modes': 's, t',
-                'l_max_scalars': config["lmax"],
-                'P_k_max_h/Mpc':  config["kmax"],
-                'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
-                'lensing': 'no',
-                'A_s':       block[cosmo, 'A_s'],
-                'n_s':       block[cosmo, 'n_s'],
-                'H0':        100*block[cosmo, 'h0'],
-                'omega_b':   block[cosmo, 'ombh2'],
-                'omega_cdm': block[cosmo, 'omch2'],
-                'tau_reio':  block[cosmo, 'tau'],
-                'T_cmb':     block.get_double(cosmo, 't_cmb', default=2.726),
-                'N_eff':     block.get_double(cosmo, 'massless_nu', default=3.046),
-                'r':         block.get_double(cosmo, 'r_t', default=0.),
-                'Omega_smg': block.get_double(cosmo, 'omega_smg', default = 0.),
-            }
-    
+            params = params_c
+    else:
+        params = params_c
         
     return params
 
