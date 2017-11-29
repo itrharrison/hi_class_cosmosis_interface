@@ -146,19 +146,23 @@ def get_class_outputs(block, c, config):
 def execute(block, config):
     c = config['cosmo']
 
-    #Set input parameters
-    params = get_class_inputs(block, config)
-    c.set(params)
-
     try:
-        #Run calculations
+        # Set input parameters
+        params = get_class_inputs(block, config)
+        c.set(params)
+
+        # Run calculations
         c.compute()
-        #Extract outputs
+
+        # Extract outputs
         get_class_outputs(block, c, config)
-
-    except:
+    except StandardError as error:
+        if config['debug']:
+            sys.stderr.write("Error in class. You set debug=T so here is more debug info:\n")
+            traceback.print_exc(file=sys.stderr)
+        else:
+            sys.stderr.write("Error in class. Set debug=T for info: {}\n".format(error))
         return 1
-
     finally:
         #Reset for re-use next time
         c.struct_cleanup()
