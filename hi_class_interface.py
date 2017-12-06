@@ -1,6 +1,7 @@
 import os
 from cosmosis.datablock import names, option_section
 import sys
+import traceback
 
 #add class directory to the path
 dirname = os.path.split(__file__)[0]
@@ -26,9 +27,12 @@ def setup(options):
         'lmax': options.get_int(option_section,'lmax', default=2000),
         'zmax': options.get_double(option_section,'zmax', default=4.0),
         'kmax': options.get_double(option_section,'kmax', default=50.0),
+        'debug': options.get_bool(option_section, 'debug', default=False),
         'lensing': options.get_string(option_section, 'lensing', default = 'no'),
         'expansion_model': options.get_string(option_section, 'expansion_model', default = 'lcdm'),
         'gravity_model':   options.get_string(option_section, 'gravity_model', default = 'propto_omega'),
+        #'modes':  options.get_string(option_section, 'modes', default = 's, t'),
+        #'output': options.get_string(option_section, 'output', default = 'tCl,pCl,lCl,mPk'),
             }
     #Create the object that connects to Class
     config['cosmo'] = classy.Class()
@@ -42,8 +46,8 @@ def get_class_inputs(block, config):
     #names and form that class expects
 
     params = {
-        'output': 'tCl,pCl,lCl,mPk',
-        'modes': 's, t',
+        'output': 'tCl,pCl,lCl,mPk',#       confit["output"],
+        'modes':  's, t', #       config["modes"],
         'l_max_scalars': config["lmax"],
         'P_k_max_h/Mpc': config["kmax"],
         'lensing':       config["lensing"],
@@ -146,17 +150,17 @@ def get_class_outputs(block, c, config):
 def execute(block, config):
     c = config['cosmo']
 
-    try:
+   # try:
         # Set input parameters
-        params = get_class_inputs(block, config)
-        c.set(params)
-
+    params = get_class_inputs(block, config)
+    c.set(params)
+    try:
         # Run calculations
         c.compute()
 
         # Extract outputs
         get_class_outputs(block, c, config)
-    except StandardError as error:
+    except classy.CosmoError as error:
         if config['debug']:
             sys.stderr.write("Error in class. You set debug=T so here is more debug info:\n")
             traceback.print_exc(file=sys.stderr)
