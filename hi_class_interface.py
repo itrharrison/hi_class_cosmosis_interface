@@ -31,8 +31,8 @@ def setup(options):
         'lensing': options.get_string(option_section, 'lensing', default = 'no'),
         'expansion_model': options.get_string(option_section, 'expansion_model', default = 'lcdm'),
         'gravity_model':   options.get_string(option_section, 'gravity_model', default = 'propto_omega'),
-        #'modes':  options.get_string(option_section, 'modes', default = 's, t'),
-        #'output': options.get_string(option_section, 'output', default = 'tCl,pCl,lCl,mPk'),
+        'modes':  options.get_string(option_section, 'modes', default = 's'),
+        'output': options.get_string(option_section, 'output', default = 'tCl,pCl'),
             }
     #Create the object that connects to Class
     config['cosmo'] = classy.Class()
@@ -46,25 +46,31 @@ def get_class_inputs(block, config):
     #names and form that class expects
 
     params = {
-        'output': 'tCl,pCl,lCl,mPk',#       confit["output"],
-        'modes':  's, t', #       config["modes"],
+        'output':        config["output"],
+        'modes':         config["modes"],
         'l_max_scalars': config["lmax"],
-        'P_k_max_h/Mpc': config["kmax"],
+        #'P_k_max_h/Mpc': config["kmax"],
         'lensing':       config["lensing"],
-        'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
+        #'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
         'n_s':          block[cosmo, 'n_s'],
-        'H0':           100*block[cosmo, 'h0'],
+#        'H0':           100*block[cosmo, 'h0'],
         'omega_b':      block[cosmo, 'ombh2'],
         'omega_cdm':    block[cosmo, 'omch2'],
         'tau_reio':     block[cosmo, 'tau'],
         'T_cmb':        block.get_double(cosmo, 't_cmb', default=2.726),
         'N_eff':        block.get_double(cosmo, 'massless_nu', default=3.046),
-        'r':            block.get_double(cosmo, 'r_t', default=0.),
+        #'r':            block.get_double(cosmo, 'r_t', default=0.),
+#        '100*theta_s':  block[cosmo, '100*theta_s'],
         }
+    #print block.keys()
+    if block.has_value(cosmo, '100*theta_s'):
+        params['100*theta_s'] = block[cosmo, '100*theta_s']
+    if block.has_value(cosmo, 'h0'):
+        params['H0'] = 100*block[cosmo, 'h0']
     if block.has_value(cosmo, 'A_s'):
         params['A_s'] = block[cosmo, 'A_s']
-    if block.has_value(cosmo, 'ln10^{10}A_s'):
-        params['ln10^{10}A_s'] = block[cosmo, 'ln10^{10}A_s']
+    if block.has_value(cosmo, 'log1e10As'):
+        params['ln10^{10}A_s'] = block[cosmo, 'log1e10As']
     if block.has_value(cosmo, 'omega_smg') and block[cosmo,'omega_smg'] < 0.:
         smgs = smg_params(block)
         params['expansion_model'] = config['expansion_model']
@@ -82,8 +88,8 @@ def get_class_outputs(block, c, config):
     ## Derived cosmological parameters
     ##
 
-    block[cosmo, 'sigma_8'] = c.sigma8()
-    h0 = block[cosmo, 'h0']
+   # block[cosmo, 'sigma_8'] = c.sigma8()
+   # h0 = block[cosmo, 'h0']
 
     ##
     ##  Matter power spectrum
@@ -91,24 +97,24 @@ def get_class_outputs(block, c, config):
 
     #Ranges of the redshift and matter power
     dz = 0.01
-    kmin = 1e-4
-    kmax = config['kmax']*h0
-    nk = 100
+   # kmin = 1e-4
+   # kmax = config['kmax']*h0
+   # nk = 100
 
     #Define k,z we want to sample
     z = np.arange(0.0, config["zmax"]+dz, dz)
-    k = np.logspace(np.log10(kmin), np.log10(kmax), nk)
+   # k = np.logspace(np.log10(kmin), np.log10(kmax), nk)
     nz = len(z)
 
     #Extract (interpolate) P(k,z) at the requested
     #sample points.
-    P = np.zeros((nk, nz))
-    for i,ki in enumerate(k):
-        for j,zj in enumerate(z):
-            P[i,j] = c.pk(ki,zj)
+   # P = np.zeros((nk, nz))
+   # for i,ki in enumerate(k):
+   #     for j,zj in enumerate(z):
+   #         P[i,j] = c.pk(ki,zj)
 
     #Save matter power as a grid
-    block.put_grid("matter_power_lin", "k_h", k/h0, "z", z, "p_k", P*h0**3)
+    #block.put_grid("matter_power_lin", "k_h", k/h0, "z", z, "p_k", P*h0**3)
 
     ##
     ##Distances and related quantities
