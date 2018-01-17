@@ -95,7 +95,7 @@ def get_class_outputs(block, c, config):
     ##
 
     block[cosmo, 'sigma_8'] = c.sigma8()
-    h0 = c.Hubble(0.)#block[cosmo, 'h0']
+    h0 = c.Hubble(0.)/100.#block[cosmo, 'h0']
 
     ##
     ##  Matter power spectrum
@@ -135,7 +135,7 @@ def get_class_outputs(block, c, config):
     d_a = np.array([c.angular_distance(zi) for zi in z])
     block[distances, 'd_a'] = d_a
     block[distances, 'd_m'] = d_a * (1+z)
-    block[distances, 'h'] = np.array([c.Hubble(zi) for zi in z])
+    block[distances, 'h'] = np.array([c.Hubble(zi)/100. for zi in z])
 
     #Save some auxiliary related parameters
     block[distances, 'age'] = c.age()
@@ -144,7 +144,10 @@ def get_class_outputs(block, c, config):
     ##
     ## Now the CMB C_ell
     ##
-    c_ell_data =  c.raw_cl()
+    if config['lensing'] == 'no':
+        c_ell_data =  c.raw_cl()
+    if config['lensing'] == 'yes':
+        c_ell_data = c.lensed_cl()
     ell = c_ell_data['ell']
     ell = ell[2:]
 
@@ -159,8 +162,7 @@ def get_class_outputs(block, c, config):
     #Save each of the four spectra
     for s in ['tt','ee','te','bb','tp']:
         block[cmb_cl, s] = c_ell_data[s][2:] * f
-    for s in ['pp']:
-        block[cmb_cl, s] = c_ell_data[s][2:] * f1
+    block[cmb_cl, 'pp'] = c_ell_data['pp'][2:] * f1
 
 def execute(block, config):
     c = config['cosmo']
