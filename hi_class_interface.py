@@ -28,8 +28,8 @@ def setup(options):
         'kmax': options.get_double(option_section,'kmax', default=50.0),
         'debug': options.get_bool(option_section, 'debug', default=False),
         'lensing': options.get_string(option_section, 'lensing', default = 'yes'),
-#        'expansion_model': options.get_string(option_section, 'expansion_model', default = 'lcdm'),
-#        'gravity_model':   options.get_string(option_section, 'gravity_model', default = 'propto_omega'),
+        'expansion_model': options.get_string(option_section, 'expansion_model', default = 'lcdm'),
+        'gravity_model':   options.get_string(option_section, 'gravity_model', default = 'propto_omega'),
         'modes':  options.get_string(option_section, 'modes', default = 's'),
         'output': options.get_string(option_section, 'output', default = 'tCl,lCl,pCl,mPk'),
         'sBBN file': options.get_string(option_section, 'sBBN file', default = '${COSMOSIS_SRC_DIR}/modules/hi_class/hi_class_devel/bbn/sBBN.dat'),
@@ -83,6 +83,7 @@ def get_class_inputs(block, config):
         params['Omega_fld'] = block.get_double(cosmo, 'omega_sfld', default = 0.)
         params['expansion_smg'] = block.get_double(cosmo, 'expansion_smg', default = 0.5)
         params['parameters_smg'] = block.get_string(cosmo, 'parameters_smg', default = smgs)
+        params['kineticity_safe_smg'] = block.get_double(cosmo, 'kineticity_safe_smg', default = 1e-5)
     if block.has_value(cosmo, 'N_ur') and block[cosmo,'N_ur'] != 3.046:
         params['N_ncdm'] = block[cosmo, 'N_ncdm']
         params['m_ncdm'] = block[cosmo, 'm_ncdm']
@@ -96,7 +97,7 @@ def get_class_outputs(block, c, config):
 
     block[cosmo, 'sigma_8'] = c.sigma8()
     h0 = c.Hubble(0.)/100.#block[cosmo, 'h0']
-
+    block[cosmo, 'omega_m'] = c.Omega_m()
     ##
     ##  Matter power spectrum
     ##
@@ -136,6 +137,7 @@ def get_class_outputs(block, c, config):
     block[distances, 'd_a'] = d_a
     block[distances, 'd_m'] = d_a * (1+z)
     block[distances, 'h'] = np.array([c.Hubble(zi)/100. for zi in z])
+    block[distances, 'mu'] = 5.*np.log10(d_a * (1+z)**2) + 25
 
     #Save some auxiliary related parameters
     block[distances, 'age'] = c.age()
