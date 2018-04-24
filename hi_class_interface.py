@@ -59,13 +59,9 @@ def get_class_inputs(block, config):
         'T_cmb':        block.get_double(cosmo, 't_cmb', default=2.726),
         'N_ur':         block.get_double(cosmo, 'N_ur', default=3.046),
         'k_pivot':      block.get_double(cosmo, 'k_pivot', default=0.05),
-#        'N_ncdm':       block.get_double(cosmo, 'N_ncdm', default=0.),
-#        'm_ncdm':       block.get_double(cosmo, 'm_ncdm', default=0.),
-#        'T_ncdm':       block.get_double(cosmo, 'T_cdm', default=0.71611),
         }
-    #print block.keys()
-#    if config.has_value('sBBN file'):
     params['sBBN file'] = config['sBBN file']
+
     if block.has_value(cosmo, '100*theta_s'):
         params['100*theta_s'] = block[cosmo, '100*theta_s']
     if block.has_value(cosmo, 'h0'):
@@ -76,6 +72,7 @@ def get_class_inputs(block, config):
         params['ln10^{10}A_s'] = block[cosmo, 'logA']
     if block.has_value(cosmo, 'omega_smg') and block[cosmo,'omega_smg'] < 0.:
         smgs = smg_params(block)
+        smgs_exp = smg_exp(block)
         params['expansion_model'] = config['expansion_model']
         params['gravity_model'] =  config['gravity_model']
         params['Omega_Lambda'] = block[cosmo, 'omega_Lambda']
@@ -196,10 +193,20 @@ def cleanup(config):
 
 def smg_params(block):
     snl =[]
-    for i in range(1,100):
+    for i in range(1,20):
         if block.has_value(cosmo, 'parameters_smg__%i'% i):
             snl.append(block[cosmo, 'parameters_smg__%i'% i])
         else:
             break
     smg = ",".join(map(str, snl))
+    return smg
+
+def smg_exp(block):
+    snl_exp =[]
+    for i in range(1,20):
+        if block.has_value(cosmo, 'expansion_smg__%i'% i):
+            snl_exp.append(block[cosmo, 'expansion_smg__%i'% i])
+        else:
+            break
+    smg_exp = ",".join(map(str, snl_exp))
     return smg
