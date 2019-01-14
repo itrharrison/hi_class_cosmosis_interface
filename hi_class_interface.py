@@ -23,16 +23,20 @@ def setup(options):
     #Read options from the ini file which are fixed across
     #the length of the chain
     config = {
-        'lmax': options.get_int(option_section,'lmax', default=2000),
-        'zmax': options.get_double(option_section,'zmax', default=4.0),
-        'kmax': options.get_double(option_section,'kmax', default=50.0),
+        'lmax': options.get_int(option_section,'lmax', default=2500),
+        'zmax': options.get_double(option_section,'zmax', default=1.),
+        'kmax': options.get_double(option_section,'kmax', default=1.0),
         'debug': options.get_bool(option_section, 'debug', default=False),
         'lensing': options.get_string(option_section, 'lensing', default = 'yes'),
         'expansion_model': options.get_string(option_section, 'expansion_model', default = 'lcdm'),
         'gravity_model':   options.get_string(option_section, 'gravity_model', default = 'propto_omega'),
         'modes':  options.get_string(option_section, 'modes', default = 's'),
-        'output': options.get_string(option_section, 'output', default = 'tCl,lCl,pCl,mPk'),
+        'output': options.get_string(option_section, 'output', default = 'tCl,lCl,pCl,mPk,mTk'),
         'sBBN file': options.get_string(option_section, 'sBBN file', default = '${COSMOSIS_SRC_DIR}/modules/hi_class/hi_class_devel/bbn/sBBN.dat'),
+        #'skip_stability_tests_smg': options.get_string(option_section, 'skip_stability_tests_smg', default = 'no'),
+        #'background_verbose': options.get_int(option_section,'background_verbose', default=1),
+        #'thermodynamics_verbose': options.get_int(option_section,'thermodynamics_verbose', default=10)
+        #'kineticity_safe_smg': options.get_double(option_section,'kineticity_safe_smg', default=1e-5)
             }
     #Create the object that connects to Class
     config['cosmo'] = classy.Class()
@@ -51,6 +55,7 @@ def get_class_inputs(block, config):
         'l_max_scalars': config["lmax"],
         'P_k_max_h/Mpc': config["kmax"],
         'lensing':       config["lensing"],
+#        'background_verbose': config["background_verbose"],
         'z_pk': ', '.join(str(z) for z in np.arange(0.0, config['zmax'], 0.01)),
         'n_s':          block[cosmo, 'n_s'],
         'omega_b':      block[cosmo, 'ombh2'],
@@ -77,14 +82,42 @@ def get_class_inputs(block, config):
         params['gravity_model'] =  config['gravity_model']
         params['Omega_Lambda'] = block[cosmo, 'omega_Lambda']
         params['Omega_smg'] = block.get_double(cosmo, 'omega_smg', default = 0.)
-        params['Omega_fld'] = block.get_double(cosmo, 'omega_sfld', default = 0.)
-        params['expansion_smg'] = block.get_double(cosmo, 'expansion_smg', default = 0.5)
+        params['Omega_fld'] = block.get_double(cosmo, 'omega_fld', default = 0.)
+        params['expansion_smg'] = block.get_string(cosmo, 'expansion_smg', default = smgs_exp)
         params['parameters_smg'] = block.get_string(cosmo, 'parameters_smg', default = smgs)
-        params['kineticity_safe_smg'] = block.get_double(cosmo, 'kineticity_safe_smg', default = 1e-5)
+#        params['skip_stability_tests_smg'] = config['skip_stability_tests_smg']
+        params['kineticity_safe_smg'] = block.get_double(cosmo, 'kineticity_safe_smg', default=0.)
     if block.has_value(cosmo, 'N_ur') and block[cosmo,'N_ur'] != 3.046:
         params['N_ncdm'] = block[cosmo, 'N_ncdm']
-        params['m_ncdm'] = block[cosmo, 'm_ncdm']
-        params['T_ncdm'] = block[cosmo, 'T_ncdm']
+
+        if block[cosmo, 'N_ncdm'] == 1:
+            if block.has_value(cosmo, 'm_ncdm'):
+                params['m_ncdm'] = block[cosmo, 'm_ncdm']
+            if block.has_value(cosmo, 'omega_ncdm'):
+                params['omega_ncdm'] = block[cosmo, 'omega_ncdm']
+            params['T_ncdm'] = block[cosmo, 'T_ncdm']
+
+        if block[cosmo, 'N_ncdm'] > 1:
+            m_nu = []
+            o_nu = []
+            T_nu = []
+            for i in range(1,4):
+                if block.has_value(cosmo, 'm_ncdm__%i'%i):
+                    m_nu.append(block[cosmo, 'm_ncdm__%i'%i])
+                    T_nu.append(block[cosmo, 'T_ncdm__%i'%i])
+                if block.has_value(cosmo, 'omega_ncdm__%i'%i):
+                    o_nu.append(block[cosmo, 'omega_ncdm__%i'%i])
+                    T_nu.append(block[cosmo, 'T_ncdm__%i'%i])
+            print 'm_nu', len(m_nu)
+            print 'omega_nu', len(o_nu)
+            if len(m_nu)>0:
+                params['m_ncdm'] = ",".join(map(str, m_nu))
+                print 'm in'
+            if len(o_nu)>0:
+                print 'omega in'
+                params['omega_ncdm'] = ",".join(map(str, o_nu))
+            params['T_ncdm'] = ",".join(map(str, T_nu))
+
     return params
 
 def get_class_outputs(block, c, config):
@@ -101,9 +134,9 @@ def get_class_outputs(block, c, config):
 
     #Ranges of the redshift and matter power
     dz = 0.01
-    kmin = 1e-4
+    kmin = 1e-5 #1e-4
     kmax = config['kmax']*h0
-    nk = 100
+    nk = 200 #1e-5
 
     #Define k,z we want to sample
     z = np.arange(0.0, config["zmax"]+dz, dz)
@@ -112,14 +145,15 @@ def get_class_outputs(block, c, config):
 
     #Extract (interpolate) P(k,z) at the requested
     #sample points.
-    P = np.zeros((nk, nz))
+    #P = np.zeros((nk,nz))
+    P = np.zeros((nk, nz)) 
     for i,ki in enumerate(k):
         for j,zj in enumerate(z):
-            P[i,j] = c.pk(ki,zj)
-
+            P[i,j] = c.pk_lin(ki,zj)
+        
     #Save matter power as a grid
     block.put_grid("matter_power_lin", "k_h", k/h0, "z", z, "p_k", P*h0**3)
-
+#    block.put_grid("matter_power_nl", "k_h", k/h0, "z", z, "p_k", P*h0**3)
     ##
     ##Distances and related quantities
     ##
@@ -129,16 +163,27 @@ def get_class_outputs(block, c, config):
     block[distances, 'nz'] = nz
 
     #Save distance samples
-    block[distances, 'd_l'] = np.array([c.luminosity_distance(zi) for zi in z])
+    d_l = np.array([c.luminosity_distance(zi) for zi in z])
+    block[distances, 'd_l'] = d_l
     d_a = np.array([c.angular_distance(zi) for zi in z])
     block[distances, 'd_a'] = d_a
     block[distances, 'd_m'] = d_a * (1+z)
-    block[distances, 'h'] = np.array([c.Hubble(zi)/100. for zi in z])
-    block[distances, 'mu'] = 5.*np.log10(d_a * (1+z)**2) + 25
-
+    block[distances, 'H'] = np.array([c.Hubble(zi) for zi in z])
+    block[distances, 'mu'] = 5.*np.log10(d_l + 1e-100) + 25.
+    
     #Save some auxiliary related parameters
     block[distances, 'age'] = c.age()
     block[distances, 'rs_zdrag'] = c.rs_drag()
+    block[distances, 'a'] = 1./(1.+z)
+
+    ## Growth stuff
+    s8 = np.array([c.sigma8_at_z(zi) for zi in z])
+    grr = np.array([c.growthrate_at_z(zi) for zi in z])
+    
+    # Save growth stuff
+    block[names.growth, 'sigma8_at_z'] = s8
+    block[names.growth, 'growthrate_at_z'] = grr
+
 
     ##
     ## Now the CMB C_ell
@@ -209,4 +254,4 @@ def smg_exp(block):
         else:
             break
     smg_exp = ",".join(map(str, snl_exp))
-    return smg
+    return smg_exp
