@@ -2,12 +2,13 @@ import os
 from cosmosis.datablock import names, option_section
 import sys
 import traceback
+import pdb
 
 #add class directory to the path
 dirname = os.path.split(__file__)[0]
 #enable debugging from the same directory
 if not dirname.strip(): dirname='.'
-install_dir = dirname+"/hi_class_devel/classy_install/lib/python2.7/site-packages/"
+install_dir = dirname+"/hi_class_public/classy_install/lib/python2.7/site-packages/"
 sys.path.insert(0, install_dir)
 
 import classy
@@ -18,6 +19,8 @@ import numpy as np
 cosmo = names.cosmological_parameters
 distances = names.distances
 cmb_cl = names.cmb_cl
+growthparams  = names.growth_parameters 
+horndeski = 'horndeski_parameters'
 
 def setup(options):
     #Read options from the ini file which are fixed across
@@ -32,7 +35,7 @@ def setup(options):
         'gravity_model':   options.get_string(option_section, 'gravity_model', default = 'propto_omega'),
         'modes':  options.get_string(option_section, 'modes', default = 's'),
         'output': options.get_string(option_section, 'output', default = 'tCl,lCl,pCl,mPk,mTk'),
-        'sBBN file': options.get_string(option_section, 'sBBN file', default = '${COSMOSIS_SRC_DIR}/modules/hi_class/hi_class_devel/bbn/sBBN.dat'),
+        'sBBN file': options.get_string(option_section, 'sBBN_file'),
         #'skip_stability_tests_smg': options.get_string(option_section, 'skip_stability_tests_smg', default = 'no'),
         #'background_verbose': options.get_int(option_section,'background_verbose', default=1),
         #'thermodynamics_verbose': options.get_int(option_section,'thermodynamics_verbose', default=10)
@@ -75,18 +78,68 @@ def get_class_inputs(block, config):
         params['A_s'] = block[cosmo, 'A_s']
     if block.has_value(cosmo, 'logA'):
         params['ln10^{10}A_s'] = block[cosmo, 'logA']
-    if block.has_value(cosmo, 'omega_smg') and block[cosmo,'omega_smg'] < 0.:
-        smgs = smg_params(block)
-        smgs_exp = smg_exp(block)
-        params['expansion_model'] = config['expansion_model']
+
+    if block.has_value(horndeski, 'omega_fld'):
+        print('Omega_fld not implemented at this stage due to conflict with cosmosis default\n \
+               behaviour for Omega_Lambda')
+        return 1
+    
+    if not block.has_value(horndeski, 'omega_smg') or (block[horndeski,'omega_smg'] == 0.):
+        # standard CLASS case
+        #params['Omega_fld'] = block.get_double(horndeski, 'omega_fld', default = 0.)
+        print('Omega_smg = 0 or unspecified, running with default CLASS')
+        #params['expansion_model'] = config['expansion_model']
+    else:
         params['gravity_model'] =  config['gravity_model']
-        params['Omega_Lambda'] = block[cosmo, 'omega_Lambda']
-        params['Omega_smg'] = block.get_double(cosmo, 'omega_smg', default = 0.)
-        params['Omega_fld'] = block.get_double(cosmo, 'omega_fld', default = 0.)
-        params['expansion_smg'] = block.get_string(cosmo, 'expansion_smg', default = smgs_exp)
-        params['parameters_smg'] = block.get_string(cosmo, 'parameters_smg', default = smgs)
-#        params['skip_stability_tests_smg'] = config['skip_stability_tests_smg']
-        params['kineticity_safe_smg'] = block.get_double(cosmo, 'kineticity_safe_smg', default=0.)
+        params['expansion_model'] = config['expansion_model']
+        smgs = smg_params(block)
+        params['parameters_smg'] = block.get_string(horndeski, 'parameters_smg', default = smgs)
+        params['kineticity_safe_smg'] = block.get_double(horndeski, 'kineticity_safe_smg', default=0.)
+
+        if block.has_value(horndeski, 'omega_smg') and block[horndeski,'omega_smg'] < 0.:
+            '''
+            Omega_smg has a negqative value. In this case the equations for the scalar field
+            will be used, you have to specify both Omega_Lambda and Omega_fld, and Omega_smg will
+            be inferred by the code using the closure equation
+            '''
+            if config['expansion_model']=='lcdm':
+                #params['expansion_smg'] = block.get_double(horndeski, 'omega_smg')
+                params['expansion_smg'] = 0.5
+            elif config['expansion_model']=='wowa':
+                expansion_smg_string = '{0}, {1}, {2}'.format(0.5, block.get_double(cosmo, 'w'), block.get_double(cosmo, 'wa'))
+                params['expansion_smg'] = expansion_smg_string
+
+            params['Omega_Lambda'] = block.get_double(cosmo, 'omega_lambda', default = 0.)
+            #params['Omega_fld'] = block.get_double(horndeski, 'omega_fld', default = 0.)
+            params['Omega_fld'] = 0.0
+            params['Omega_smg'] = block.get_int(horndeski, 'omega_smg', default = -1)
+
+        elif block.has_value(horndeski, 'omega_smg') and (block[horndeski,'omega_smg'] > 0.) and (block[horndeski,'omega_smg'] < 1.):
+            '''
+            Omega_smg has a value larger than 0 but smaller than 1. In this case you should
+            leave either Omega_Lambda or Omega_fld unspecified. Then, hi_class will run
+            with the scalar field equations, and Omega_Lambda or Omega_fld will be inferred
+            using the closure equation (sum_i Omega_i) equals (1 + Omega_k)
+            '''
+            if config['expansion_model']=='lcdm':
+                params['expansion_smg'] = block.get_double(horndeski, 'omega_smg')
+            elif config['expansion_model']=='wowa':
+                expansion_smg_string = '{0}, {1}, {2}'.format(block.get_string(horndeski, 'omega_smg'), block.get_string(cosmo, 'w'), block.get_string(cosmo, 'wa'))
+
+            params['Omega_smg'] = block.get_double(horndeski, 'omega_smg')
+
+            '''
+            if block.has_value(horndeski, 'omega_lambda_smg') and block.has_value(horndeski, 'omega_fld'):
+                print('Both omega_lambda_smg and omega_fld specified, along with 0 < Omega_smg < 1\nOne should be left unspecfied')
+                return 1 
+            if block.has_value(horndeski, 'omega_lambda_smg'):
+                params['Omega_Lambda'] = block.get_double(horndeski, 'omega_lambda_smg', default = 0.)
+                # ToDo:
+                # make sure omega-Lambda inferred from closure is used elsewhere.
+            if block.has_value(horndeski, 'omega_fld'):
+                params['Omega_fld'] = block.get_double(horndeski, 'omega_fld', default = 0.)
+            '''
+
     if block.has_value(cosmo, 'N_ur') and block[cosmo,'N_ur'] != 3.046:
         params['N_ncdm'] = block[cosmo, 'N_ncdm']
 
@@ -120,14 +173,15 @@ def get_class_inputs(block, config):
 
     return params
 
-def get_class_outputs(block, c, config):
+def get_class_outputs(block, c_classy, config):
     ##
     ## Derived cosmological parameters
     ##
-
-    block[cosmo, 'sigma_8'] = c.sigma8()
-    h0 = c.Hubble(0.)/100.#block[cosmo, 'h0']
-    block[cosmo, 'omega_m'] = c.Omega_m()
+    #pdb.set_trace()
+    block[cosmo, 'sigma_8'] = c_classy.sigma8()
+    h0 = c_classy.Hubble(0.)/100.#block[cosmo, 'h0']
+    block[cosmo, 'omega_m'] = c_classy.Omega_m()
+    block[cosmo, 'omega_lambda_smg'] = c_classy.Omega_smg()
     ##
     ##  Matter power spectrum
     ##
@@ -149,8 +203,9 @@ def get_class_outputs(block, c, config):
     P = np.zeros((nk, nz)) 
     for i,ki in enumerate(k):
         for j,zj in enumerate(z):
-            P[i,j] = c.pk_lin(ki,zj)
-        
+            #P[i,j] = c_classy.pk_lin(ki,zj)
+            P[i,j] = c_classy.pk(ki,zj)
+
     #Save matter power as a grid
     block.put_grid("matter_power_lin", "k_h", k/h0, "z", z, "p_k", P*h0**3)
 #    block.put_grid("matter_power_nl", "k_h", k/h0, "z", z, "p_k", P*h0**3)
@@ -163,35 +218,40 @@ def get_class_outputs(block, c, config):
     block[distances, 'nz'] = nz
 
     #Save distance samples
-    d_l = np.array([c.luminosity_distance(zi) for zi in z])
+    d_l = np.array([c_classy.luminosity_distance(zi) for zi in z])
     block[distances, 'd_l'] = d_l
-    d_a = np.array([c.angular_distance(zi) for zi in z])
+    d_a = np.array([c_classy.angular_distance(zi) for zi in z])
     block[distances, 'd_a'] = d_a
     block[distances, 'd_m'] = d_a * (1+z)
-    block[distances, 'H'] = np.array([c.Hubble(zi) for zi in z])
+    block[distances, 'H'] = np.array([c_classy.Hubble(zi) for zi in z])
     block[distances, 'mu'] = 5.*np.log10(d_l + 1e-100) + 25.
     
     #Save some auxiliary related parameters
-    block[distances, 'age'] = c.age()
-    block[distances, 'rs_zdrag'] = c.rs_drag()
+    block[distances, 'age'] = c_classy.age()
+    block[distances, 'rs_zdrag'] = c_classy.rs_drag()
     block[distances, 'a'] = 1./(1.+z)
 
     ## Growth stuff
-    s8 = np.array([c.sigma8_at_z(zi) for zi in z])
-    grr = np.array([c.growthrate_at_z(zi) for zi in z])
+    s8 = np.array([c_classy.sigma8_at_z(zi) for zi in z])
+    grr = np.array([c_classy.growthrate_at_z(zi) for zi in z])
     
     # Save growth stuff
-    block[names.growth, 'sigma8_at_z'] = s8
-    block[names.growth, 'growthrate_at_z'] = grr
+    #block[names.growth, 'sigma8_at_z'] = s8
+    #block[names.growth, 'growthrate_at_z'] = grr
+    block[growthparams, 'z'] = z
+    f_z = np.array([c_classy.linear_growth_rate(zi) for zi in z])
+    block[growthparams, 'f_z'] = f_z
+    D_z = np.array([c_classy.linear_growth_factor(zi) for zi in z])
+    block[growthparams, 'D_z'] = D_z
 
 
     ##
     ## Now the CMB C_ell
     ##
     if config['lensing'] == 'no':
-        c_ell_data =  c.raw_cl()
+        c_ell_data =  c_classy.raw_cl()
     if config['lensing'] == 'yes':
-        c_ell_data = c.lensed_cl()
+        c_ell_data = c_classy.lensed_cl()
     ell = c_ell_data['ell']
     ell = ell[2:]
 
@@ -209,18 +269,18 @@ def get_class_outputs(block, c, config):
     block[cmb_cl, 'pp'] = c_ell_data['pp'][2:] * f1
 
 def execute(block, config):
-    c = config['cosmo']
+    c_classy = config['cosmo']
 
    # try:
         # Set input parameters
     params = get_class_inputs(block, config)
-    c.set(params)
+    c_classy.set(params)
+    #print(c_classy.pars)
     try:
         # Run calculations
-        c.compute()
-
+        c_classy.compute()
         # Extract outputs
-        get_class_outputs(block, c, config)
+        get_class_outputs(block, c_classy, config)
     except classy.CosmoError as error:
         if config['debug']:
             sys.stderr.write("Error in class. You set debug=T so here is more debug info:\n")
@@ -230,7 +290,7 @@ def execute(block, config):
         return 1
     finally:
         #Reset for re-use next time
-        c.struct_cleanup()
+        c_classy.struct_cleanup()
     return 0
 
 def cleanup(config):
@@ -239,8 +299,8 @@ def cleanup(config):
 def smg_params(block):
     snl =[]
     for i in range(1,20):
-        if block.has_value(cosmo, 'parameters_smg__%i'% i):
-            snl.append(block[cosmo, 'parameters_smg__%i'% i])
+        if block.has_value(horndeski, 'parameters_smg__%i'% i):
+            snl.append(block[horndeski, 'parameters_smg__%i'% i]) # "propto_omega" -> x_k, x_b, x_m, x_t, M*^2_ini (default)
         else:
             break
     smg = ",".join(map(str, snl))
